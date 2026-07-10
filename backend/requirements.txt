@@ -1,0 +1,8 @@
+fastapi
+pydantic
+langchain
+langchain_community
+langchain_core
+langchain_groq
+langchain_classic
+langchain_huggingface
