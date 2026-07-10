@@ -1,17 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from services.llm import get_groq_model
 from fastapi.responses import Response
-from schemas.models import ChatRequest
+from schemas.models import ChatRequest, SessionArtifacts
 from langchain_classic.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from services.session import get_history
-from store.session_store import history_store
+from services.history import get_history
+from store.session_store import history_store, vector_store, uploaded_files
 from langchain_core.messages import get_buffer_string
 
-router = APIRouter()
+chat_router = APIRouter()
 
-@router.post("/chat")
-def start_chat(mssg: ChatRequest):
+@chat_router.post("/chat")
+def start_chat(mssg: ChatRequest, session_id: SessionArtifacts):
     llm = get_groq_model("llama-3.3-70b-versatile")
 
     prompt = ChatPromptTemplate.from_messages([
@@ -28,7 +28,6 @@ def start_chat(mssg: ChatRequest):
             4. Fallback to General Knowledge: If the provided documents do not contain the answer, or if no documents are provided, you may rely on your general training data to answer the question. If you do this, make it clear that you are drawing from general knowledge rather than the retrieved files.
             5. Do Not Hallucinate: Never invent facts, data, or quotes that are not supported by the context or your established knowledge base. Keep your tone friendly, concise, and direct.'''
         ),
-        
         MessagesPlaceholder(variable_name="history"),
         ("user", "{question}")
     ])
@@ -41,23 +40,25 @@ def start_chat(mssg: ChatRequest):
     },
     config={
         "configurable":{
-            "session_id": "S01"
+            "session_id": session_id.id
         }
     })
 
     return Response(status_code=200, content=response.content)
 
 
-@router.delete("/delete")
-def delete_chat_history(session_id: str):
+@chat_router.delete("/delete")
+def delete_session_history(session_id: str):
     if session_id in history_store:
-        del history_store[session_id]
+        history_store.pop(session_id, None)
+        vector_store.pop(session_id, None)
+        uploaded_files.pop(session_id, None)
         return Response(status_code=200, content= f"Chat history for {session_id} deleted successfully...")
     else:
         raise HTTPException(status_code=404, detail= f"{session_id} not found!")
     
 
-@router.get("/history")
+@chat_router.get("/history")
 def get_session_history(session_id: str):
     if session_id in history_store:
         message_history = history_store[session_id]
