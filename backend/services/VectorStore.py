@@ -8,6 +8,7 @@ from store.session_store import vector_store, uploaded_files
 from services.hash_file import hash_file_bytes
 import os
 
+file_path = None
 
 def create_vector_store(id: str, file: UploadFile):
     try:
@@ -42,5 +43,5 @@ def create_vector_store(id: str, file: UploadFile):
         return vector_store[id]
     
     finally:
-        if os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             os.remove(file_path)
