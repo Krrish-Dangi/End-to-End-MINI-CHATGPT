@@ -1,3 +1,4 @@
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -15,28 +16,69 @@ interface AIMessageProps {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1.5 py-2 px-1">
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="block h-2 w-2 rounded-full bg-aura-violet"
-          animate={{
-            scale: [1, 1.4, 1],
-            opacity: [0.4, 1, 0.4],
-          }}
-          transition={{
-            duration: 1,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: i * 0.2,
-          }}
-        />
-      ))}
+    <div className="flex items-center gap-1.5 py-2 mt-1">
+      <div className="glass rounded-2xl px-4 py-2.5 shadow-sm border border-aura-border/40 flex items-center gap-1.5 backdrop-blur-md bg-white/[0.02]">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="block h-1.5 w-1.5 rounded-full bg-aura-text-muted"
+            animate={{
+              y: [0, -3, 0],
+              opacity: [0.4, 1, 0.4],
+            }}
+            transition={{
+              duration: 0.8,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: i * 0.15,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 function AIMessage({ message, isLoading = false }: AIMessageProps) {
+  // Only apply typewriter effect to NEW messages (less than 2 seconds old when mounted)
+  // and only if they are not the loading placeholder.
+  const isNew = useMemo(() => {
+    if (isLoading || message.id === '__loading__') return false;
+    const age = Date.now() - new Date(message.timestamp).getTime();
+    return age < 2000;
+  }, [message.id, message.timestamp, isLoading]);
+
+  const [displayedContent, setDisplayedContent] = useState(isNew ? '' : message.content);
+
+  useEffect(() => {
+    if (!isNew) {
+      setDisplayedContent(message.content);
+      return;
+    }
+
+    let currentIndex = displayedContent.length;
+    const targetContent = message.content;
+    const totalLength = targetContent.length;
+
+    if (currentIndex >= totalLength) return;
+
+    // Type the whole message in ~1.5 seconds max, or faster for short messages
+    const durationMs = Math.min(1500, totalLength * 20);
+    const charsPerTick = Math.max(1, Math.ceil(totalLength / (durationMs / 16)));
+
+    const interval = setInterval(() => {
+      currentIndex += charsPerTick;
+      if (currentIndex >= totalLength) {
+        setDisplayedContent(targetContent);
+        clearInterval(interval);
+      } else {
+        setDisplayedContent(targetContent.slice(0, currentIndex));
+      }
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, [message.content, isNew]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -49,7 +91,7 @@ function AIMessage({ message, isLoading = false }: AIMessageProps) {
         <div className="flex items-start gap-3">
           {/* Aura avatar */}
           <div
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full mt-1"
             style={{
               background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
             }}
@@ -64,7 +106,7 @@ function AIMessage({ message, isLoading = false }: AIMessageProps) {
             ) : (
               <div className="ai-prose">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content}
+                  {displayedContent}
                 </ReactMarkdown>
               </div>
             )}

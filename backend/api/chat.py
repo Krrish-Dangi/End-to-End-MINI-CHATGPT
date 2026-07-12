@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from services.llm import get_groq_model
 from fastapi.responses import Response, JSONResponse
-from schemas.models import ChatRequest, SessionArtifacts
+from schemas.models import ChatRequest
 from langchain_classic.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from services.history import get_history
-from store.session_store import history_store, vector_store, uploaded_files
+from services.title import create_chat_title
+from store.session_store import conversation_store, vector_store, uploaded_files
 from langchain_core.messages import get_buffer_string
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from operator import itemgetter
@@ -57,13 +58,18 @@ def start_chat(request: ChatRequest):
         }
     })
 
+    message_hist = conversation_store.get(request.id, list())["history"].messages
+    if len(message_hist) == 2:
+        create_chat_title(request.text, request.id)
+
+
     return Response(status_code=200, content=response.content)
 
 
 @chat_router.delete("/delete")
 def delete_session_history(session_id: str):
-    if session_id in history_store:
-        history_store.pop(session_id, None)
+    if session_id in conversation_store:
+        conversation_store.pop(session_id, None)
         vector_store.pop(session_id, None)
         uploaded_files.pop(session_id, None)
         return Response(status_code=200, content= f"Chat history for {session_id} deleted successfully...")
@@ -73,8 +79,8 @@ def delete_session_history(session_id: str):
 
 @chat_router.get("/history")
 def get_session_history(session_id: str):
-    if session_id in history_store:
-        message_history = history_store[session_id]
+    if session_id in conversation_store:
+        message_history = conversation_store.get(session_id)["history"]
         res = []
         for mssg in message_history.messages:
             res.append({
@@ -85,4 +91,10 @@ def get_session_history(session_id: str):
         return JSONResponse(status_code=200, content= res)
     
     raise HTTPException(status_code=404, detail= f"{session_id} not found...")
-        
+
+@chat_router.get("/conversation_metadata")
+def get_metadata(session_id: str):
+    if session_id in conversation_store:
+        return JSONResponse(status_code=200, content={"title": conversation_store[session_id]["title"], "created_at": conversation_store[session_id]["created_at"]})
+    
+    raise HTTPException(status_code=404, detail= f"{session_id} not found...")

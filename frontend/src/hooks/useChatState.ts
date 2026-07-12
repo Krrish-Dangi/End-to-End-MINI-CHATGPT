@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Message, Conversation } from '../types';
-import { generateId } from '../utils';
 import * as chatService from '../services/chatService';
 
 interface ChatState {
@@ -24,12 +23,19 @@ export function useChatState() {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Load conversation history on mount
-  useEffect(() => {
-    chatService.getConversations().then((conversations) => {
-      setState((prev) => ({ ...prev, conversations }));
-    });
+  const loadConversations = useCallback(async () => {
+    const conversations = await chatService.getConversations();
+    setState((prev) => ({ ...prev, conversations }));
   }, []);
+
+  // Load conversation history on mount & listen to updates
+  useEffect(() => {
+    loadConversations();
+
+    const handleUpdate = () => loadConversations();
+    window.addEventListener('aura-conversation-updated', handleUpdate);
+    return () => window.removeEventListener('aura-conversation-updated', handleUpdate);
+  }, [loadConversations]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -41,40 +47,37 @@ export function useChatState() {
   const sendMessage = useCallback(async (content: string, attachments?: File[]) => {
     if (!content.trim() && (!attachments || attachments.length === 0)) return;
 
+    let targetConv = state.activeConversation;
+    
+    // If no active conversation, create one
+    if (!targetConv) {
+      targetConv = await chatService.createConversation();
+      // Instantly load the new conversation into the sidebar list
+      loadConversations();
+    }
+
+    const conversationId = targetConv.id;
+
     const userMessage: Message = {
-      id: generateId(),
+      id: `temp-${Date.now()}`,
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
     };
 
+    // Optimistically update UI
     setState((prev) => {
-      const conversationId = prev.activeConversation?.id || generateId();
-      const existingConversation = prev.activeConversation || {
-        id: conversationId,
-        title: content.trim().slice(0, 50) || 'New Conversation',
-        messages: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
       const updatedMessages = [...prev.messages, userMessage];
-
       return {
         ...prev,
         messages: updatedMessages,
         hasStartedChat: true,
         isLoading: true,
-        activeConversation: {
-          ...existingConversation,
-          messages: updatedMessages,
-          updatedAt: new Date(),
-        },
+        activeConversation: targetConv,
       };
     });
 
     try {
-      const conversationId = state.activeConversation?.id || 'new';
       const response = await chatService.sendMessage(conversationId, content, attachments);
 
       setState((prev) => {
@@ -92,11 +95,13 @@ export function useChatState() {
             : null,
         };
       });
+      // Optionally reload conversations list to update timestamp
+      loadConversations();
     } catch (error) {
       console.error('Failed to send message:', error);
       setState((prev) => ({ ...prev, isLoading: false }));
     }
-  }, [state.activeConversation?.id]);
+  }, [state.activeConversation, loadConversations]);
 
   const newChat = useCallback(() => {
     setState((prev) => ({
@@ -107,12 +112,25 @@ export function useChatState() {
     }));
   }, []);
 
-  const selectConversation = useCallback((conversation: Conversation) => {
+  const selectConversation = useCallback(async (conversation: Conversation) => {
+    // Optimistic UI change to switch quickly
     setState((prev) => ({
       ...prev,
       activeConversation: conversation,
-      messages: conversation.messages,
-      hasStartedChat: conversation.messages.length > 0,
+      messages: [],
+      isLoading: true, // Loading history...
+      hasStartedChat: true,
+    }));
+
+    // Fetch full history from backend via service
+    const fullConv = await chatService.getConversation(conversation.id);
+    
+    setState((prev) => ({
+      ...prev,
+      activeConversation: fullConv || conversation,
+      messages: fullConv ? fullConv.messages : [],
+      isLoading: false,
+      hasStartedChat: (fullConv ? fullConv.messages.length : 0) > 0,
     }));
   }, []);
 
@@ -122,14 +140,14 @@ export function useChatState() {
 
   const deleteConversation = useCallback(async (id: string) => {
     await chatService.deleteConversation(id);
+    await loadConversations();
     setState((prev) => ({
       ...prev,
-      conversations: prev.conversations.filter((c) => c.id !== id),
       ...(prev.activeConversation?.id === id
         ? { activeConversation: null, messages: [], hasStartedChat: false }
         : {}),
     }));
-  }, []);
+  }, [loadConversations]);
 
   return {
     ...state,

@@ -1,180 +1,175 @@
-/**
- * Chat Service — Isolated API layer for FastAPI backend integration.
- *
- * Currently uses mock responses for UI development.
- * Replace the mock logic with actual fetch/axios calls when the backend is ready.
- */
-
 import type { Message, Conversation } from '../types';
 import { generateId } from '../utils';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const STORAGE_KEY = 'aura_conversations';
 
-// ─── Mock AI Responses ───
-const mockResponses: string[] = [
-  `That's a great question! Let me break it down for you.
-
-## Key Points
-
-1. **First**, consider the architecture of your system
-2. **Second**, think about the data flow
-3. **Third**, optimize for performance
-
-Here's a quick example:
-
-\`\`\`python
-def process_data(input_data):
-    """Process and transform data efficiently."""
-    result = transform(input_data)
-    return optimize(result)
-\`\`\`
-
-> The best approach is to start simple and iterate.
-
-Let me know if you'd like me to elaborate on any of these points!`,
-
-  `I'd be happy to help with that! Here's what I recommend:
-
-### Approach
-
-The most effective strategy involves three phases:
-
-| Phase | Action | Timeline |
-|-------|--------|----------|
-| Discovery | Research & Analysis | Week 1-2 |
-| Design | Architecture & Prototyping | Week 3-4 |
-| Build | Implementation & Testing | Week 5-8 |
-
-Each phase builds on the previous one, ensuring a solid foundation.
-
-Feel free to ask follow-up questions!`,
-
-  `Absolutely! Here's a comprehensive overview:
-
-## Understanding the Concept
-
-This is a fundamental concept in modern software development. The key insight is that **simplicity drives reliability**.
-
-### Benefits
-- Improved maintainability
-- Better performance characteristics
-- Easier debugging and testing
-- Enhanced developer experience
-
-### Implementation
-
-\`\`\`typescript
-interface Config {
-  mode: 'development' | 'production';
-  features: string[];
-  optimizations: boolean;
+// ─── LocalStorage Helpers ───
+function getStoredConversations(): Conversation[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (!data) return [];
+    
+    // Parse JSON and convert string dates back to Date objects
+    const parsed = JSON.parse(data);
+    return parsed.map((conv: any) => ({
+      ...conv,
+      createdAt: new Date(conv.createdAt),
+      updatedAt: new Date(conv.updatedAt),
+      messages: conv.messages || []
+    })).sort((a: Conversation, b: Conversation) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  } catch (err) {
+    console.error("Failed to parse conversations from localStorage", err);
+    return [];
+  }
 }
 
-const defaultConfig: Config = {
-  mode: 'development',
-  features: ['core', 'analytics'],
-  optimizations: true,
-};
-\`\`\`
+function saveStoredConversations(conversations: Conversation[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+}
 
-The configuration above gives you a solid starting point. Would you like me to go deeper into any specific area?`,
-];
-
-function getRandomResponse(): string {
-  return mockResponses[Math.floor(Math.random() * mockResponses.length)];
+function updateConversationTitle(id: string, newTitle: string) {
+  const convs = getStoredConversations();
+  const index = convs.findIndex(c => c.id === id);
+  if (index !== -1) {
+    convs[index].title = newTitle;
+    convs[index].updatedAt = new Date();
+    saveStoredConversations(convs);
+  }
 }
 
 // ─── Service Methods ───
 
-export async function sendMessage(
-  conversationId: string,
-  content: string,
-  _attachments?: File[]
-): Promise<Message> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000));
-
-  // Mock AI response
-  const response: Message = {
-    id: generateId(),
-    role: 'assistant',
-    content: getRandomResponse(),
-    timestamp: new Date(),
-  };
-
-  return response;
-}
-
 export async function createConversation(): Promise<Conversation> {
   const conversation: Conversation = {
     id: generateId(),
-    title: 'New Conversation',
+    title: 'New Chat',
     messages: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
+  const convs = getStoredConversations();
+  saveStoredConversations([conversation, ...convs]);
+
   return conversation;
 }
 
 export async function getConversations(): Promise<Conversation[]> {
-  // Mock conversation history
-  return [
-    {
-      id: generateId(),
-      title: 'Understanding Neural Networks',
-      messages: [],
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    },
-    {
-      id: generateId(),
-      title: 'React Architecture Patterns',
-      messages: [],
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    },
-    {
-      id: generateId(),
-      title: 'FastAPI Best Practices',
-      messages: [],
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
-    },
-    {
-      id: generateId(),
-      title: 'Design System Implementation',
-      messages: [],
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 72),
-    },
-    {
-      id: generateId(),
-      title: 'Deploying to Production',
-      messages: [],
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 120),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 120),
-    },
-  ];
+  return getStoredConversations();
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {
-  // In production, fetch from API
-  return null;
+  const convs = getStoredConversations();
+  const conversation = convs.find(c => c.id === id);
+  if (!conversation) return null;
+
+  try {
+    const res = await fetch(`${API_BASE}/history?session_id=${id}`);
+    if (res.ok) {
+      const history = await res.json();
+      // Map backend JSON to frontend Message type
+      conversation.messages = history.map((msg: {type: string, content: string}, idx: number) => ({
+        id: `${id}-msg-${idx}`,
+        role: msg.type === 'human' ? 'user' : 'assistant',
+        content: msg.content,
+        timestamp: new Date() // Backend doesn't store timestamps yet, using current time
+      }));
+    } else {
+      // If history not found on backend (e.g., server restart), it will just return empty messages
+      conversation.messages = [];
+    }
+  } catch (error) {
+    console.error("Error fetching history:", error);
+  }
+
+  return conversation;
 }
 
-export async function deleteConversation(id: string): Promise<void> {
-  // In production, call DELETE endpoint
-  console.log(`Deleted conversation ${id}`);
-}
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  attachments?: File[]
+): Promise<Message> {
+  
+  // 1. Upload files first if any
+  if (attachments && attachments.length > 0) {
+    for (const file of attachments) {
+      const formData = new FormData();
+      formData.append('id', conversationId);
+      formData.append('file', file);
 
-export async function uploadFile(file: File): Promise<{ id: string; name: string; url: string }> {
-  // Simulate upload
-  await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        await fetch(`${API_BASE}/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (err) {
+        console.error("Failed to upload file:", err);
+      }
+    }
+  }
+
+  // 2. Send the message
+  const res = await fetch(`${API_BASE}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      text: content,
+      id: conversationId
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to send message');
+  }
+
+  const aiContent = await res.text();
+
+  // 3. Check if we should fetch the LLM generated title
+  // We do this by hitting the metadata endpoint if the conversation title is 'New Chat'
+  setTimeout(async () => {
+    const convs = getStoredConversations();
+    const currentConv = convs.find(c => c.id === conversationId);
+    if (currentConv && currentConv.title === 'New Chat') {
+      try {
+        const metaRes = await fetch(`${API_BASE}/conversation_metadata?session_id=${conversationId}`);
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          if (meta.title) {
+            updateConversationTitle(conversationId, meta.title);
+            // We dispatch a custom event so the UI knows to refresh the sidebar if it wants to
+            window.dispatchEvent(new Event('aura-conversation-updated'));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch metadata title", e);
+      }
+    }
+  }, 1000);
 
   return {
     id: generateId(),
-    name: file.name,
-    url: URL.createObjectURL(file),
+    role: 'assistant',
+    content: aiContent,
+    timestamp: new Date(),
   };
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  // Call backend to clear memory
+  try {
+    await fetch(`${API_BASE}/delete?session_id=${id}`, {
+      method: 'DELETE'
+    });
+  } catch (error) {
+    console.error("Failed to delete backend session", error);
+  }
+
+  // Remove from localStorage
+  const convs = getStoredConversations();
+  const filtered = convs.filter(c => c.id !== id);
+  saveStoredConversations(filtered);
 }
