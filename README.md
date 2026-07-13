@@ -1,6 +1,6 @@
-# Mini ChatGPT
+# LumiAI - Mini ChatGPT
 
-Mini ChatGPT is a full-stack, local-first AI chatbot application designed for seamless conversations and document-based question answering. It features a modern glassmorphic user interface, robust authentication, and Retrieval-Augmented Generation (RAG) capabilities.
+LumiAI is a full-stack, local-first AI chatbot application designed for seamless conversations and document-based question answering. It features a modern glassmorphic user interface, robust authentication, and Retrieval-Augmented Generation (RAG) capabilities.
 
 ## Capabilities
 
