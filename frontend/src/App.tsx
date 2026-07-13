@@ -101,7 +101,9 @@ export default function App() {
               transition={{ delay: 0.2, duration: 0.6 }}
             >
               <h1 className="mb-3 text-4xl font-semibold tracking-tight text-lumi-text">
-                {greeting}, <span className="bg-gradient-to-r from-lumi-violet via-lumi-purple to-lumi-magenta bg-clip-text text-transparent">Krrish</span>
+                {greeting}, <span className="bg-gradient-to-r from-lumi-violet via-lumi-purple to-lumi-magenta bg-clip-text text-transparent">
+                  {user ? (user.user_metadata?.name?.split(' ')[0] || 'Friend') : 'there'}
+                </span>
               </h1>
               <p className="text-lg text-lumi-text-muted">
                 How can I help you today?
