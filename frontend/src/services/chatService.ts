@@ -1,13 +1,40 @@
 import type { Message, Conversation } from '../types';
 import { generateId } from '../utils';
+import { supabase } from '../lib/supabase';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const STORAGE_KEY = 'aura_conversations';
+const STORAGE_KEY = 'lumi_conversations';
+const USER_ID_KEY = 'lumi_guest_user_id';
 
-// ─── LocalStorage Helpers ───
-function getStoredConversations(): Conversation[] {
+// ─── LocalStorage & SessionStorage Helpers ───
+
+// Gets the active user ID (Supabase must be logged in)
+async function getUserId(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    return session.user.id;
+  }
+  throw new Error("Authentication required");
+}
+
+// Gets the Authorization header if logged in
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    return { 'Authorization': `Bearer ${session.access_token}` };
+  }
+  return {};
+}
+
+async function getStorageKey(): Promise<string> {
+  const userId = await getUserId();
+  return `lumi_conversations_${userId}`;
+}
+
+async function getStoredConversations(): Promise<Conversation[]> {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const key = await getStorageKey();
+    const data = localStorage.getItem(key);
     if (!data) return [];
     
     // Parse JSON and convert string dates back to Date objects
@@ -24,17 +51,18 @@ function getStoredConversations(): Conversation[] {
   }
 }
 
-function saveStoredConversations(conversations: Conversation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+async function saveStoredConversations(conversations: Conversation[]) {
+  const key = await getStorageKey();
+  localStorage.setItem(key, JSON.stringify(conversations));
 }
 
-function updateConversationTitle(id: string, newTitle: string) {
-  const convs = getStoredConversations();
+async function updateConversationTitle(id: string, newTitle: string) {
+  const convs = await getStoredConversations();
   const index = convs.findIndex(c => c.id === id);
   if (index !== -1) {
     convs[index].title = newTitle;
     convs[index].updatedAt = new Date();
-    saveStoredConversations(convs);
+    await saveStoredConversations(convs);
   }
 }
 
@@ -49,34 +77,41 @@ export async function createConversation(): Promise<Conversation> {
     updatedAt: new Date(),
   };
 
-  const convs = getStoredConversations();
-  saveStoredConversations([conversation, ...convs]);
+  const convs = await getStoredConversations();
+  await saveStoredConversations([conversation, ...convs]);
 
   return conversation;
 }
 
 export async function getConversations(): Promise<Conversation[]> {
-  return getStoredConversations();
+  return await getStoredConversations();
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {
-  const convs = getStoredConversations();
+  const convs = await getStoredConversations();
   const conversation = convs.find(c => c.id === id);
   if (!conversation) return null;
 
   try {
-    const res = await fetch(`${API_BASE}/history?session_id=${id}`);
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${API_BASE}/history?session_id=${id}`, {
+      headers: { ...authHeaders }
+    });
+    
     if (res.ok) {
       const history = await res.json();
-      // Map backend JSON to frontend Message type
-      conversation.messages = history.map((msg: {type: string, content: string}, idx: number) => ({
-        id: `${id}-msg-${idx}`,
-        role: msg.type === 'human' ? 'user' : 'assistant',
-        content: msg.content,
-        timestamp: new Date() // Backend doesn't store timestamps yet, using current time
-      }));
+      // Map backend JSON to frontend Message type, preserving local attachments if any
+      conversation.messages = history.map((msg: {type: string, content: string}, idx: number) => {
+        const existing = conversation.messages.find(m => m.content === msg.content && m.role === (msg.type === 'human' ? 'user' : 'assistant'));
+        return {
+          id: existing ? existing.id : `${id}-msg-${idx}`,
+          role: msg.type === 'human' ? 'user' : 'assistant',
+          content: msg.content,
+          timestamp: existing ? existing.timestamp : new Date(),
+          attachments: existing?.attachments
+        };
+      });
     } else {
-      // If history not found on backend (e.g., server restart), it will just return empty messages
       conversation.messages = [];
     }
   } catch (error) {
@@ -91,17 +126,21 @@ export async function sendMessage(
   content: string,
   attachments?: File[]
 ): Promise<Message> {
+  const userId = await getUserId();
+  const authHeaders = await getAuthHeaders();
   
   // 1. Upload files first if any
   if (attachments && attachments.length > 0) {
     for (const file of attachments) {
       const formData = new FormData();
-      formData.append('id', conversationId);
+      formData.append('session_id', conversationId);
+      formData.append('user_id', userId);
       formData.append('file', file);
 
       try {
         await fetch(`${API_BASE}/upload`, {
           method: 'POST',
+          headers: { ...authHeaders },
           body: formData,
         });
       } catch (err) {
@@ -114,11 +153,13 @@ export async function sendMessage(
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...authHeaders
     },
     body: JSON.stringify({
       text: content,
-      id: conversationId
+      session_id: conversationId,
+      user_id: userId
     })
   });
 
@@ -129,19 +170,19 @@ export async function sendMessage(
   const aiContent = await res.text();
 
   // 3. Check if we should fetch the LLM generated title
-  // We do this by hitting the metadata endpoint if the conversation title is 'New Chat'
   setTimeout(async () => {
-    const convs = getStoredConversations();
+    const convs = await getStoredConversations();
     const currentConv = convs.find(c => c.id === conversationId);
     if (currentConv && currentConv.title === 'New Chat') {
       try {
-        const metaRes = await fetch(`${API_BASE}/conversation_metadata?session_id=${conversationId}`);
+        const metaRes = await fetch(`${API_BASE}/conversation_metadata?session_id=${conversationId}&user_id=${userId}`, {
+          headers: { ...authHeaders }
+        });
         if (metaRes.ok) {
           const meta = await metaRes.json();
           if (meta.title) {
-            updateConversationTitle(conversationId, meta.title);
-            // We dispatch a custom event so the UI knows to refresh the sidebar if it wants to
-            window.dispatchEvent(new Event('aura-conversation-updated'));
+            await updateConversationTitle(conversationId, meta.title);
+            window.dispatchEvent(new Event('lumi-conversation-updated'));
           }
         }
       } catch (e) {
@@ -159,17 +200,20 @@ export async function sendMessage(
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  // Call backend to clear memory
+  const authHeaders = await getAuthHeaders();
+  
+  // Call backend to clear memory/db
   try {
     await fetch(`${API_BASE}/delete?session_id=${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { ...authHeaders }
     });
   } catch (error) {
     console.error("Failed to delete backend session", error);
   }
 
   // Remove from localStorage
-  const convs = getStoredConversations();
+  const convs = await getStoredConversations();
   const filtered = convs.filter(c => c.id !== id);
-  saveStoredConversations(filtered);
+  await saveStoredConversations(filtered);
 }

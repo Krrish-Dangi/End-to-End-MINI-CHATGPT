@@ -68,14 +68,56 @@ def update_metadata(request: ChatRequest):
     with sq.connect("store/lumi.db") as connection:
         cursor = connection.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
-        query = '''
-        UPDATE conversations
-        SET updated_at = ?
-        WHERE user_id = ?
-        AND session_id = ?;    
-        '''
-
-        cursor.execute(query, (datetime.now(), request.user_id, request.session_id))
+        
+        # Check current title
+        check_query = "SELECT title FROM conversations WHERE user_id = ? AND session_id = ?"
+        title_res = cursor.execute(check_query, (request.user_id, request.session_id)).fetchone()
+        
+        new_title = None
+        if title_res and title_res[0] == "New Chat":
+            sys_message = '''
+            You are an AI that generates conversation titles.
+            Generate a short descriptive title for the conversation.
+            Requirements:
+            - 2–5 words
+            - No quotation marks
+            - No emojis
+            - No period
+            - Title Case
+            - Summarize the user's intent
+            Return ONLY the title.
+            '''
+            from services.llm import get_groq_model
+            from langchain_core.prompts import ChatPromptTemplate
+            model = get_groq_model()
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", sys_message),
+                ("user", "{question}")
+            ])
+            chain = prompt|model
+            try:
+                response = chain.invoke({"question": request.text})
+                new_title = response.content
+            except Exception:
+                pass
+                
+        if new_title:
+            query = '''
+            UPDATE conversations
+            SET updated_at = ?, title = ?
+            WHERE user_id = ?
+            AND session_id = ?;    
+            '''
+            cursor.execute(query, (datetime.now(), new_title, request.user_id, request.session_id))
+        else:
+            query = '''
+            UPDATE conversations
+            SET updated_at = ?
+            WHERE user_id = ?
+            AND session_id = ?;    
+            '''
+            cursor.execute(query, (datetime.now(), request.user_id, request.session_id))
+            
         connection.commit()
 
 def get_metadata(session_id: str, user_id: str):

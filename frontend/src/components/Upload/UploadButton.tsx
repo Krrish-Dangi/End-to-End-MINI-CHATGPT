@@ -33,8 +33,8 @@ export default function UploadButton({ onUpload, disabled }: UploadButtonProps) 
         disabled={disabled}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        className="rounded-xl p-2 text-aura-text-muted transition-colors duration-200
-                   hover:text-aura-text hover:bg-white/5
+        className="rounded-xl p-2 text-lumi-text-muted transition-colors duration-200
+                   hover:text-lumi-text hover:bg-white/5
                    disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="Attach PDF files"
       >

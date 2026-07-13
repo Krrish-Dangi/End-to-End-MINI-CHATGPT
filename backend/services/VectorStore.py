@@ -10,7 +10,7 @@ import sqlite3 as sq
 from datetime import datetime
 
 
-def create_vector_store(session_id: str, file: UploadFile):
+def create_vector_store(session_id: str, user_id: str, file: UploadFile):
     try:
         file_path = None
         ## Check whether file is already uploaded
@@ -51,6 +51,14 @@ def create_vector_store(session_id: str, file: UploadFile):
         with sq.connect("store/lumi.db") as connection:
             cursor = connection.cursor()
             cursor.execute("PRAGMA foreign_keys = ON;")
+            
+            # Ensure the conversation exists first (if this is the first file uploaded before any message)
+            conv_query = '''
+            INSERT OR IGNORE INTO conversations (session_id, user_id, created_at, updated_at, title)
+            VALUES (?, ?, ?, ?, ?)
+            '''
+            cursor.execute(conv_query, (session_id, user_id, datetime.now(), datetime.now(), "New Chat"))
+
             query ='''
             INSERT INTO uploaded_files (session_id, filename, file_hash, uploaded_at) VALUES
             (?, ?, ?, ?)

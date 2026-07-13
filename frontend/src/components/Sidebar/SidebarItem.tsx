@@ -19,8 +19,8 @@ function SidebarItem({ icon, label, onClick, isActive = false }: SidebarItemProp
           transition-colors duration-200 cursor-pointer
           ${
             isActive
-              ? 'bg-aura-violet/10 text-aura-violet shadow-[0_0_12px_rgba(139,92,246,0.15)]'
-              : 'text-aura-text-secondary hover:bg-white/5 hover:text-aura-text'
+              ? 'bg-lumi-violet/10 text-lumi-violet shadow-[0_0_12px_rgba(139,92,246,0.15)]'
+              : 'text-lumi-text-secondary hover:bg-white/5 hover:text-lumi-text'
           }
         `}
       >

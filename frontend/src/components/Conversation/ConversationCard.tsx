@@ -32,7 +32,7 @@ function ConversationCard({
         transition-colors duration-200 group
         ${
           isActive
-            ? 'bg-aura-violet/10 border border-aura-violet/20'
+            ? 'bg-lumi-violet/10 border border-lumi-violet/20'
             : 'border border-transparent hover:bg-white/[0.03]'
         }
       `}
@@ -41,7 +41,7 @@ function ConversationCard({
       {isActive && (
         <motion.div
           layoutId="active-conversation-bar"
-          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-aura-violet"
+          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-lumi-violet"
           transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         />
       )}
@@ -50,12 +50,12 @@ function ConversationCard({
       <div className="flex-1 min-w-0 pl-1">
         <p
           className={`text-sm font-medium line-clamp-1 ${
-            isActive ? 'text-aura-text' : 'text-aura-text-secondary'
+            isActive ? 'text-lumi-text' : 'text-lumi-text-secondary'
           }`}
         >
           {conversation.title}
         </p>
-        <p className="text-xs text-aura-text-muted mt-0.5">
+        <p className="text-xs text-lumi-text-muted mt-0.5">
           {formatDate(conversation.updatedAt)}
         </p>
       </div>
@@ -72,7 +72,7 @@ function ConversationCard({
             onDelete(conversation.id);
           }}
           className="absolute top-2 right-2 p-1.5 rounded-lg
-            text-aura-text-muted hover:text-aura-error hover:bg-aura-error/10
+            text-lumi-text-muted hover:text-lumi-error hover:bg-lumi-error/10
             transition-colors duration-150 cursor-pointer"
         >
           <Trash2 size={14} />

@@ -1,32 +1,32 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════
-   AURA — Design System (Tailwind CSS v4 @theme)
+   LUMI — Design System (Tailwind CSS v4 @theme)
    ═══════════════════════════════════════════════════ */
 
 @theme {
   /* ─── Colors ─── */
-  --color-aura-bg: #0B0F14;
-  --color-aura-bg-secondary: #111827;
-  --color-aura-card: #171B22;
-  --color-aura-elevated: #1E293B;
-  --color-aura-border: rgba(255, 255, 255, 0.06);
-  --color-aura-border-hover: rgba(255, 255, 255, 0.12);
+  --color-lumi-bg: #0B0F14;
+  --color-lumi-bg-secondary: #111827;
+  --color-lumi-card: #171B22;
+  --color-lumi-elevated: #1E293B;
+  --color-lumi-border: rgba(255, 255, 255, 0.06);
+  --color-lumi-border-hover: rgba(255, 255, 255, 0.12);
 
   /* Accent */
-  --color-aura-violet: #8B5CF6;
-  --color-aura-purple: #A855F7;
-  --color-aura-magenta: #D946EF;
-  --color-aura-indigo: #6366F1;
-  --color-aura-cyan: #22D3EE;
-  --color-aura-blue: #3B82F6;
+  --color-lumi-violet: #8B5CF6;
+  --color-lumi-purple: #A855F7;
+  --color-lumi-magenta: #D946EF;
+  --color-lumi-indigo: #6366F1;
+  --color-lumi-cyan: #22D3EE;
+  --color-lumi-blue: #3B82F6;
 
   /* Semantic */
-  --color-aura-success: #10B981;
-  --color-aura-error: #EF4444;
-  --color-aura-text: #F1F5F9;
-  --color-aura-text-secondary: #94A3B8;
-  --color-aura-text-muted: #64748B;
+  --color-lumi-success: #10B981;
+  --color-lumi-error: #EF4444;
+  --color-lumi-text: #F1F5F9;
+  --color-lumi-text-secondary: #94A3B8;
+  --color-lumi-text-muted: #64748B;
 
   /* ─── Font Family ─── */
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;

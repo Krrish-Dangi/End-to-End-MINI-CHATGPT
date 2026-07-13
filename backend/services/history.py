@@ -36,7 +36,8 @@ def get_history(session_id: str):
         messages = cursor.execute(query, (session_id,)).fetchall()
         for role, content in messages:
             pair = dict()
-            pair[role] = content
+            pair["type"] = role
+            pair["content"] = content
             history.append(pair)
 
     return history

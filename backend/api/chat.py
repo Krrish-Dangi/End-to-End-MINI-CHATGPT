@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from services.llm import get_groq_model
 from fastapi.responses import Response, JSONResponse
 from schemas.models import ChatRequest
@@ -10,12 +10,22 @@ from langchain_core.runnables import RunnablePassthrough
 from operator import itemgetter
 from langchain_chroma import Chroma
 from services.embedding import get_embedding_model
+from services.auth import verify_user, validate_access
 import sqlite3 as sq
 
 chat_router = APIRouter()
 
+def get_user_id_for_session(session_id: str) -> str:
+    with sq.connect("store/lumi.db") as conn:
+        cursor = conn.cursor()
+        res = cursor.execute("SELECT user_id FROM conversations WHERE session_id = ?", (session_id,)).fetchone()
+        if res:
+            return res[0]
+        return None
+
 @chat_router.post("/chat")
-def start_chat(request: ChatRequest):
+def start_chat(request: ChatRequest, token_user_id: str | None = Depends(verify_user)):
+    validate_access(request.user_id, token_user_id)
     with sq.connect("store/lumi.db") as conn:
         cursor = conn.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
@@ -77,40 +87,42 @@ def start_chat(request: ChatRequest):
 
 
 @chat_router.delete("/delete")
-def delete_session_history(session_id: str):
+def delete_session_history(session_id: str, token_user_id: str | None = Depends(verify_user)):
+    db_user_id = get_user_id_for_session(session_id)
+    if not db_user_id:
+        raise HTTPException(status_code=404, detail=f"{session_id} not found!")
+    
+    validate_access(db_user_id, token_user_id)
+
     with sq.connect("store/lumi.db") as connection:
         cursor = connection.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
+        
         query = '''
-        SELECT 1
-        FROM conversations
-        WHERE session_id = ?;
+        DELETE FROM conversations WHERE session_id = ?;
         '''
-
-        flag = cursor.execute(query, (session_id,)).fetchone()
-
-        if flag is not None:
-            query = '''
-            DELETE FROM conversations WHERE session_id = ?;
-            '''
-            
-            cursor.execute(query, (session_id,))
-            
-            try:
-                embedder = get_embedding_model()
-                db = Chroma(persist_directory="store/vector_db", embedding_function=embedder, collection_name= session_id)
-                db.delete_collection()
-            except Exception as e:
-                raise Exception(e)
-            
-            connection.commit()
-            return Response(status_code=200, content= f"Chat history for {session_id} deleted successfully...")
-        else:
-            raise HTTPException(status_code=404, detail= f"{session_id} not found!")
+        
+        cursor.execute(query, (session_id,))
+        
+        try:
+            embedder = get_embedding_model()
+            db = Chroma(persist_directory="store/vector_db", embedding_function=embedder, collection_name= session_id)
+            db.delete_collection()
+        except Exception as e:
+            raise Exception(e)
+        
+        connection.commit()
+        return Response(status_code=200, content= f"Chat history for {session_id} deleted successfully...")
     
 
 @chat_router.get("/history")
-def get_session_history(session_id: str):
+def get_session_history(session_id: str, token_user_id: str | None = Depends(verify_user)):
+    db_user_id = get_user_id_for_session(session_id)
+    if not db_user_id:
+        raise HTTPException(status_code=404, detail=f"{session_id} not found...")
+        
+    validate_access(db_user_id, token_user_id)
+
     with sq.connect("store/lumi.db") as connection:
         cursor = connection.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
@@ -126,10 +138,13 @@ def get_session_history(session_id: str):
         res = get_history(session_id=session_id)
         return JSONResponse(status_code=200, content= res)
     
-    raise HTTPException(status_code=404, detail= f"{session_id} not found...")
+    # If no messages yet, return empty list instead of 404
+    return JSONResponse(status_code=200, content=[])
 
 @chat_router.get("/conversation_metadata")
-def metadata(session_id: str, user_id: str):
+def metadata(session_id: str, user_id: str, token_user_id: str | None = Depends(verify_user)):
+    validate_access(user_id, token_user_id)
+    
     res = get_metadata(session_id=session_id, user_id= user_id)
     if res != {}:
         return JSONResponse(status_code=200, content=res)

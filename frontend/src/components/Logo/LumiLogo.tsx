@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-interface AuraLogoProps {
+interface LumiLogoProps {
   size?: number;
   isVisible?: boolean;
 }
@@ -68,7 +68,7 @@ const RING_LAYERS = [
   },
 ];
 
-function AuraLogo({ size = 180, isVisible = true }: AuraLogoProps) {
+function LumiLogo({ size = 180, isVisible = true }: LumiLogoProps) {
   const scale = size / 180;
   const center = 50; // SVG viewBox center
   const svgSize = 100; // SVG viewBox size
@@ -147,7 +147,7 @@ function AuraLogo({ size = 180, isVisible = true }: AuraLogoProps) {
       >
         <defs>
           {/* Glow filter */}
-          <filter id="aura-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <filter id="lumi-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
@@ -157,7 +157,7 @@ function AuraLogo({ size = 180, isVisible = true }: AuraLogoProps) {
           </filter>
 
           {/* Stronger glow for outer ring */}
-          <filter id="aura-glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+          <filter id="lumi-glow-strong" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
@@ -190,7 +190,7 @@ function AuraLogo({ size = 180, isVisible = true }: AuraLogoProps) {
             strokeDasharray={layer.dashArray}
             strokeLinecap="round"
             opacity={layer.opacity}
-            filter="url(#aura-glow)"
+            filter="url(#lumi-glow)"
             className={layer.pulseClass}
             style={{ transformOrigin: `${center}px ${center}px` }}
           />
@@ -205,7 +205,7 @@ function AuraLogo({ size = 180, isVisible = true }: AuraLogoProps) {
           stroke="url(#ring-gradient)"
           strokeWidth={1}
           opacity={0.25}
-          filter="url(#aura-glow-strong)"
+          filter="url(#lumi-glow-strong)"
           className="animate-breathe"
           style={{ transformOrigin: `${center}px ${center}px` }}
         />
@@ -230,4 +230,4 @@ function AuraLogo({ size = 180, isVisible = true }: AuraLogoProps) {
   );
 }
 
-export default AuraLogo;
+export default LumiLogo;

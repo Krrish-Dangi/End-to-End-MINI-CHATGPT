@@ -9,3 +9,5 @@ langchain_huggingface
 langchain-chroma
 pypdf
 sentence-transformers
+PyJWT
+python-dotenv

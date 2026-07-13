@@ -6,9 +6,12 @@ import {
   Plus,
   Search,
   User,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import SidebarItem from './SidebarItem';
 import ConversationCard from '../Conversation/ConversationCard';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface Conversation {
   id: string;
@@ -24,6 +27,9 @@ interface SidebarProps {
   activeConversationId?: string;
   onSelectConversation: (conv: Conversation) => void;
   onDeleteConversation: (id: string) => void;
+  user: SupabaseUser | null;
+  onLoginClick: () => void;
+  onSignOut: () => void;
 }
 
 function Sidebar({
@@ -34,6 +40,9 @@ function Sidebar({
   activeConversationId,
   onSelectConversation,
   onDeleteConversation,
+  user,
+  onLoginClick,
+  onSignOut
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -45,7 +54,7 @@ function Sidebar({
     <motion.aside
       animate={{ width: isOpen ? 280 : 68 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className="h-full flex flex-col bg-aura-bg-secondary border-r border-aura-border overflow-hidden shrink-0"
+      className="h-full flex flex-col bg-lumi-bg-secondary border-r border-lumi-border overflow-hidden shrink-0"
     >
       {/* ═══ TOP BAR ═══ */}
       <div className="pt-4 px-3 shrink-0">
@@ -67,10 +76,10 @@ function Sidebar({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 className="flex items-center gap-2 rounded-lg px-2.5 py-1.5
-                           text-aura-text-secondary hover:text-aura-text
+                           text-lumi-text-secondary hover:text-lumi-text
                            hover:bg-white/5 transition-colors duration-200"
               >
-                <Plus size={18} className="text-aura-violet shrink-0" />
+                <Plus size={18} className="text-lumi-violet shrink-0" />
                 <span className="text-sm font-medium whitespace-nowrap">New Chat</span>
               </motion.button>
 
@@ -80,7 +89,7 @@ function Sidebar({
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.92 }}
                 className="flex items-center justify-center w-8 h-8 rounded-lg
-                           text-aura-text-muted hover:text-aura-text
+                           text-lumi-text-muted hover:text-lumi-text
                            hover:bg-white/5 transition-colors duration-200"
                 aria-label="Collapse sidebar"
               >
@@ -127,7 +136,7 @@ function Sidebar({
               <div className="relative">
                 <Search
                   size={15}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-aura-text-muted z-10 pointer-events-none"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-lumi-text-muted z-10 pointer-events-none"
                 />
                 <input
                   type="text"
@@ -136,10 +145,10 @@ function Sidebar({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-xl
                     bg-white/[0.04] backdrop-blur-sm
-                    border border-aura-border
-                    text-aura-text placeholder:text-aura-text-muted
+                    border border-lumi-border
+                    text-lumi-text placeholder:text-lumi-text-muted
                     outline-none
-                    focus:border-aura-violet/30 focus:bg-white/[0.06]
+                    focus:border-lumi-violet/30 focus:bg-white/[0.06]
                     transition-all duration-200"
                 />
               </div>
@@ -158,7 +167,7 @@ function Sidebar({
                   />
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-aura-text-muted">
+                <div className="flex flex-col items-center justify-center py-8 text-lumi-text-muted">
                   <Search size={20} className="mb-2 opacity-40" />
                   <p className="text-xs">
                     {searchQuery ? 'No results found' : 'No conversations yet'}
@@ -170,8 +179,8 @@ function Sidebar({
         )}
       </AnimatePresence>
 
-      {/* ═══ BOTTOM: User Profile (always rendered, text fades smoothly) ═══ */}
-      <div className="mt-auto shrink-0 border-t border-aura-border">
+      {/* ═══ BOTTOM: User Profile ═══ */}
+      <div className="mt-auto shrink-0 border-t border-lumi-border relative group">
         <motion.div
           layout
           transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
@@ -183,10 +192,13 @@ function Sidebar({
           <motion.div
             layout="position"
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-aura-violet to-aura-magenta
-                       flex items-center justify-center shrink-0 cursor-pointer"
+            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+              user
+                ? 'bg-gradient-to-br from-lumi-violet to-lumi-magenta text-white'
+                : 'bg-lumi-bg border border-lumi-border text-lumi-text-muted'
+            }`}
           >
-            <User size={15} className="text-white" />
+            <User size={15} />
           </motion.div>
 
           {/* Name + Email — fades in/out smoothly */}
@@ -205,15 +217,31 @@ function Sidebar({
                   width: 0,
                   transition: { opacity: { duration: 0.1 }, width: { duration: 0.25, delay: 0.05 } },
                 }}
-                className="min-w-0 overflow-hidden"
+                className="min-w-0 overflow-hidden flex-1"
               >
-                <p className="text-sm font-medium text-aura-text truncate">
-                  Krrish
+                <p className="text-sm font-medium text-lumi-text truncate">
+                  {user ? (user.user_metadata?.name || 'Authenticated User') : 'Guest'}
                 </p>
-                <p className="text-xs text-aura-text-muted truncate">
-                  krrish@aura.dev
+                <p className="text-xs text-lumi-text-muted truncate">
+                  {user ? user.email : 'History clears on exit'}
                 </p>
               </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Action Button (Login/Logout) */}
+          <AnimatePresence>
+            {isOpen && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: { delay: 0.2 } }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                onClick={user ? onSignOut : onLoginClick}
+                className="p-2 text-lumi-text-muted hover:text-lumi-text hover:bg-white/5 rounded-xl transition-colors"
+                title={user ? 'Sign Out' : 'Sign In'}
+              >
+                {user ? <LogOut size={16} /> : <LogIn size={16} />}
+              </motion.button>
             )}
           </AnimatePresence>
         </motion.div>

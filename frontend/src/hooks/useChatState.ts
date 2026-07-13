@@ -33,8 +33,8 @@ export function useChatState() {
     loadConversations();
 
     const handleUpdate = () => loadConversations();
-    window.addEventListener('aura-conversation-updated', handleUpdate);
-    return () => window.removeEventListener('aura-conversation-updated', handleUpdate);
+    window.addEventListener('lumi-conversation-updated', handleUpdate);
+    return () => window.removeEventListener('lumi-conversation-updated', handleUpdate);
   }, [loadConversations]);
 
   // Scroll to bottom when messages change
@@ -63,6 +63,12 @@ export function useChatState() {
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
+      attachments: attachments?.map((f, i) => ({
+        id: `att-${Date.now()}-${i}`,
+        name: f.name,
+        type: f.type,
+        size: f.size
+      }))
     };
 
     // Optimistically update UI

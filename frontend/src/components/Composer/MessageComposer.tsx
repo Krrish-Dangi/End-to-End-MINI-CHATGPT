@@ -82,15 +82,15 @@ export default function MessageComposer({
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{ duration: 0.2 }}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-white/5
-                             border border-aura-border px-2.5 py-1 text-xs text-aura-text-secondary"
+                             border border-lumi-border px-2.5 py-1 text-xs text-lumi-text-secondary"
                 >
-                  <FileText size={13} className="text-aura-violet shrink-0" />
+                  <FileText size={13} className="text-lumi-violet shrink-0" />
                   <span className="max-w-[140px] truncate">{file.name}</span>
                   <button
                     type="button"
                     onClick={() => removeAttachment(idx)}
-                    className="ml-0.5 rounded p-0.5 text-aura-text-muted
-                               hover:text-aura-text hover:bg-white/10 transition-colors"
+                    className="ml-0.5 rounded p-0.5 text-lumi-text-muted
+                               hover:text-lumi-text hover:bg-white/10 transition-colors"
                     aria-label={`Remove ${file.name}`}
                   >
                     <X size={12} />
@@ -107,10 +107,10 @@ export default function MessageComposer({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask Aura anything..."
+          placeholder="Ask Lumi anything..."
           rows={1}
-          className="w-full resize-none bg-transparent text-aura-text text-[15px]
-                     leading-relaxed placeholder:text-aura-text-muted
+          className="w-full resize-none bg-transparent text-lumi-text text-[15px]
+                     leading-relaxed placeholder:text-lumi-text-muted
                      border-none outline-none px-2 py-2"
           style={{ minHeight: '52px', maxHeight: '200px' }}
           disabled={isLoading}
@@ -128,8 +128,8 @@ export default function MessageComposer({
             disabled={!canSend}
             whileHover={canSend ? { scale: 1.05 } : {}}
             whileTap={canSend ? { scale: 0.92 } : {}}
-            className="rounded-xl bg-gradient-to-r from-aura-violet to-aura-purple
-                       p-2.5 text-white shadow-lg shadow-aura-violet/20
+            className="rounded-xl bg-gradient-to-r from-lumi-violet to-lumi-purple
+                       p-2.5 text-white shadow-lg shadow-lumi-violet/20
                        transition-opacity duration-200
                        disabled:opacity-35 disabled:cursor-not-allowed"
             aria-label="Send message"

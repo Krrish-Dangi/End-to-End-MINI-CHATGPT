@@ -17,11 +17,11 @@ interface AIMessageProps {
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1.5 py-2 mt-1">
-      <div className="glass rounded-2xl px-4 py-2.5 shadow-sm border border-aura-border/40 flex items-center gap-1.5 backdrop-blur-md bg-white/[0.02]">
+      <div className="glass rounded-2xl px-4 py-2.5 shadow-sm border border-lumi-border/40 flex items-center gap-1.5 backdrop-blur-md bg-white/[0.02]">
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            className="block h-1.5 w-1.5 rounded-full bg-aura-text-muted"
+            className="block h-1.5 w-1.5 rounded-full bg-lumi-text-muted"
             animate={{
               y: [0, -3, 0],
               opacity: [0.4, 1, 0.4],
@@ -89,7 +89,7 @@ function AIMessage({ message, isLoading = false }: AIMessageProps) {
       <div className="max-w-[680px]">
         {/* Avatar + Content */}
         <div className="flex items-start gap-3">
-          {/* Aura avatar */}
+          {/* Lumi avatar */}
           <div
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full mt-1"
             style={{
@@ -114,7 +114,7 @@ function AIMessage({ message, isLoading = false }: AIMessageProps) {
         </div>
 
         {/* Timestamp */}
-        <p className="mt-1.5 pl-10 text-xs text-aura-text-muted">
+        <p className="mt-1.5 pl-10 text-xs text-lumi-text-muted">
           {formatTimestamp(message.timestamp)}
         </p>
       </div>

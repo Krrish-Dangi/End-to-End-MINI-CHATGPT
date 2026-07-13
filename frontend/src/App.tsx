@@ -1,13 +1,19 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppLayout from './components/Layout/AppLayout';
 import Sidebar from './components/Sidebar/Sidebar';
-import AuraLogo from './components/Logo/AuraLogo';
+import LumiLogo from './components/Logo/LumiLogo';
 import MessageComposer from './components/Composer/MessageComposer';
 import ChatContainer from './components/Chat/ChatContainer';
+import AuthModal from './components/Auth/AuthModal';
 import { useChatState } from './hooks/useChatState';
+import { useAuth } from './hooks/useAuth';
 import { getGreeting } from './utils';
 
 export default function App() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   const {
     conversations,
     activeConversation,
@@ -34,11 +40,30 @@ export default function App() {
       activeConversationId={activeConversation?.id}
       onSelectConversation={(conv: any) => selectConversation(conv)}
       onDeleteConversation={deleteConversation}
+      user={user}
+      onLoginClick={() => setIsAuthModalOpen(true)}
+      onSignOut={signOut}
     />
   );
 
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-lumi-bg">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-lumi-violet"></div>
+      </div>
+    );
+  }
+
+  // Force AuthModal open if no user
+  const requireAuth = !user;
+
   return (
     <AppLayout sidebar={sidebar}>
+      <AuthModal 
+        isOpen={requireAuth || isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        hideCloseButton={requireAuth} 
+      />
       {/* ═══ STATE 1: Landing Screen ═══ */}
       <AnimatePresence mode="wait">
         {!hasStartedChat && (
@@ -60,7 +85,7 @@ export default function App() {
                 transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
               }}
             >
-              <AuraLogo size={180} />
+              <LumiLogo size={180} />
             </motion.div>
 
             {/* Greeting */}
@@ -75,10 +100,10 @@ export default function App() {
               }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              <h1 className="mb-3 text-4xl font-semibold tracking-tight text-aura-text">
-                {greeting}, <span className="bg-gradient-to-r from-aura-violet via-aura-purple to-aura-magenta bg-clip-text text-transparent">Krrish</span>
+              <h1 className="mb-3 text-4xl font-semibold tracking-tight text-lumi-text">
+                {greeting}, <span className="bg-gradient-to-r from-lumi-violet via-lumi-purple to-lumi-magenta bg-clip-text text-transparent">Krrish</span>
               </h1>
-              <p className="text-lg text-aura-text-muted">
+              <p className="text-lg text-lumi-text-muted">
                 How can I help you today?
               </p>
             </motion.div>
@@ -137,8 +162,8 @@ export default function App() {
                   isLoading={isLoading}
                   isCentered={false}
                 />
-                <p className="mt-3 text-center text-xs text-aura-text-muted/60">
-                  Aura can make mistakes. Consider checking important information.
+                <p className="mt-3 text-center text-xs text-lumi-text-muted/60">
+                  Lumi can make mistakes. Consider checking important information.
                 </p>
               </div>
             </motion.div>

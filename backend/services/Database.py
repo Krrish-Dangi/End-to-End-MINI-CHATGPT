@@ -1,6 +1,8 @@
 import sqlite3 as sq
+import os
 
 def initialize_database():
+    os.makedirs("store", exist_ok=True)
     connection = sq.connect("store/lumi.db")
     try:
         cursor = connection.cursor()
