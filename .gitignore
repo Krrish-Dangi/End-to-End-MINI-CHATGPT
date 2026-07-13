@@ -41,7 +41,7 @@ htmlcov/
 *.sqlite3
 
 # ChromaDB
-chroma_db/
+vector_db/
 
 # Learnings
 learnings.ipynb

@@ -4,19 +4,31 @@ from langchain_classic.document_loaders import PyPDFLoader
 import tempfile
 from services.chunking import split_text
 from langchain_chroma import Chroma
-from store.session_store import vector_store, uploaded_files
 from services.hash_file import hash_file_bytes
 import os
+import sqlite3 as sq
+from datetime import datetime
 
-file_path = None
 
-def create_vector_store(id: str, file: UploadFile):
+def create_vector_store(session_id: str, file: UploadFile):
     try:
+        file_path = None
         ## Check whether file is already uploaded
         hash_value = hash_file_bytes(file)
         file.file.seek(0) ## Otherwise file.read() will read 0 bytes
-        files_already_uploaded = uploaded_files.setdefault(id, set())
-        if hash_value in files_already_uploaded:
+        with sq.connect("store/lumi.db") as connection:
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON;")
+            query = '''
+            SELECT 1
+            FROM uploaded_files
+            WHERE session_id = ? AND file_hash = ?;
+            '''
+            cursor.execute(query, (session_id, hash_value))
+            flag = cursor.fetchone()
+        
+        ## If exists return
+        if flag is not None:
             return None
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
@@ -28,20 +40,25 @@ def create_vector_store(id: str, file: UploadFile):
 
         docs = split_text(chunks= content, size= 1000, overlap = 100)
 
-        ## If Chroma DNE
-        if id not in vector_store:
-            embedder = get_embedding_model(name="Qwen/Qwen3-Embedding-0.6B")
-            vector_store[id] = Chroma.from_documents(documents=docs, embedding=embedder)
-        
-        ## If Chroma does exists
-        else:
-            vector_store[id].add_documents(docs)
+        embedder = get_embedding_model()
 
-        ## If its new add it to the uploaded_files
-        uploaded_files[id].add(hash_value)
+        ## Find Chroma DB and then add docs
+        directory = "store/vector_db"
+        db = Chroma(persist_directory=directory, embedding_function=embedder, collection_name= session_id)
+        db.add_documents(docs)
 
-        return vector_store[id]
-    
+        ## If its new add it to the table
+        with sq.connect("store/lumi.db") as connection:
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON;")
+            query ='''
+            INSERT INTO uploaded_files (session_id, filename, file_hash, uploaded_at) VALUES
+            (?, ?, ?, ?)
+            '''
+            cursor.execute(query, (session_id, file.filename, hash_value, datetime.now()))
+            connection.commit()
+
+        return True
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)

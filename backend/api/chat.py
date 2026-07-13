@@ -4,19 +4,36 @@ from fastapi.responses import Response, JSONResponse
 from schemas.models import ChatRequest
 from langchain_classic.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from services.history import get_history
-from services.title import create_chat_title
-from store.session_store import conversation_store, vector_store, uploaded_files
-from langchain_core.messages import get_buffer_string
+from services.history import get_history, load_history, add_history
+from services.metadata import create_convo_metadata, update_metadata, get_metadata
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from operator import itemgetter
+from langchain_chroma import Chroma
+from services.embedding import get_embedding_model
+import sqlite3 as sq
 
 chat_router = APIRouter()
 
 @chat_router.post("/chat")
 def start_chat(request: ChatRequest):
-    llm = get_groq_model("llama-3.3-70b-versatile")
+    with sq.connect("store/lumi.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
+        query = '''
+        SELECT 1
+        FROM conversations
+        WHERE session_id = ?
+        AND user_id = ?;
+        '''
 
+        flag = cursor.execute(query, (request.session_id, request.user_id)).fetchone()
+
+        if flag is None:
+            create_convo_metadata(request)
+        else:
+            update_metadata(request)
+
+    llm = get_groq_model()
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", 
@@ -37,64 +54,84 @@ def start_chat(request: ChatRequest):
         ("user", "{question}")
     ])
 
-    db = vector_store.get(request.id)
-    if db == None:
-        chain = RunnablePassthrough.assign(
-            context=RunnableLambda(lambda _: "")
-        )|prompt|llm
-    else:
-        retriever = db.as_retriever()
-        chain = RunnablePassthrough.assign(
-            context=itemgetter("question") | retriever
-        )|prompt|llm
+    embedder = get_embedding_model()
+    db = Chroma(persist_directory="store/vector_db", embedding_function=embedder, collection_name= request.session_id)
+    retriever = db.as_retriever()
+    chain = RunnablePassthrough.assign(
+        context=itemgetter("question") | retriever
+    )|prompt|llm
 
-    chat_with_history = RunnableWithMessageHistory(runnable=chain, get_session_history= get_history, input_messages_key="question", history_messages_key="history")
+    chat_with_history = RunnableWithMessageHistory(runnable=chain, get_session_history= load_history, input_messages_key="question", history_messages_key="history")
     response = chat_with_history.invoke(input= {
         "question": request.text,
     },
     config={
         "configurable":{
-            "session_id": request.id
+            "session_id": request.session_id
         }
     })
 
-    message_hist = conversation_store.get(request.id, list())["history"].messages
-    if len(message_hist) == 2:
-        create_chat_title(request.text, request.id)
-
+    add_history(request.session_id, request.text, response.content)
 
     return Response(status_code=200, content=response.content)
 
 
 @chat_router.delete("/delete")
 def delete_session_history(session_id: str):
-    if session_id in conversation_store:
-        conversation_store.pop(session_id, None)
-        vector_store.pop(session_id, None)
-        uploaded_files.pop(session_id, None)
-        return Response(status_code=200, content= f"Chat history for {session_id} deleted successfully...")
-    else:
-        raise HTTPException(status_code=404, detail= f"{session_id} not found!")
+    with sq.connect("store/lumi.db") as connection:
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
+        query = '''
+        SELECT 1
+        FROM conversations
+        WHERE session_id = ?;
+        '''
+
+        flag = cursor.execute(query, (session_id,)).fetchone()
+
+        if flag is not None:
+            query = '''
+            DELETE FROM conversations WHERE session_id = ?;
+            '''
+            
+            cursor.execute(query, (session_id,))
+            
+            try:
+                embedder = get_embedding_model()
+                db = Chroma(persist_directory="store/vector_db", embedding_function=embedder, collection_name= session_id)
+                db.delete_collection()
+            except Exception as e:
+                raise Exception(e)
+            
+            connection.commit()
+            return Response(status_code=200, content= f"Chat history for {session_id} deleted successfully...")
+        else:
+            raise HTTPException(status_code=404, detail= f"{session_id} not found!")
     
 
 @chat_router.get("/history")
 def get_session_history(session_id: str):
-    if session_id in conversation_store:
-        message_history = conversation_store.get(session_id)["history"]
-        res = []
-        for mssg in message_history.messages:
-            res.append({
-                "type": mssg.type,
-                "content": mssg.content
-            })
+    with sq.connect("store/lumi.db") as connection:
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
 
+        query = '''
+        SELECT 1
+        FROM messages
+        WHERE session_id = ?;
+        '''
+        flag = cursor.execute(query, (session_id,)).fetchone()
+
+    if flag is not None:
+        res = get_history(session_id=session_id)
         return JSONResponse(status_code=200, content= res)
     
     raise HTTPException(status_code=404, detail= f"{session_id} not found...")
 
 @chat_router.get("/conversation_metadata")
-def get_metadata(session_id: str):
-    if session_id in conversation_store:
-        return JSONResponse(status_code=200, content={"title": conversation_store[session_id]["title"], "created_at": conversation_store[session_id]["created_at"]})
+def metadata(session_id: str, user_id: str):
+    res = get_metadata(session_id=session_id, user_id= user_id)
+    if res != {}:
+        return JSONResponse(status_code=200, content=res)
     
     raise HTTPException(status_code=404, detail= f"{session_id} not found...")
