@@ -6,7 +6,7 @@ from langchain_classic.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from services.history import get_history, load_history, add_history
 from services.metadata import create_convo_metadata, update_metadata, get_metadata
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+from langchain_core.runnables import RunnablePassthrough
 from operator import itemgetter
 from langchain_chroma import Chroma
 from services.embedding import get_embedding_model

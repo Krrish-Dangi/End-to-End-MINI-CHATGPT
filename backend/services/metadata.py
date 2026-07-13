@@ -1,5 +1,4 @@
 from services.llm import get_groq_model
-from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from datetime import datetime
 import sqlite3 as sq
