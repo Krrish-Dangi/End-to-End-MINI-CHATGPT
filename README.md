@@ -249,4 +249,4 @@ Some of the key challenges solved while building LumiAI:
 
 **Krrish Kumar Dangi**
 
-If you found this project interesting, consider giving it a ⭐ on GitHub.
+If you found this project interesting, consider giving it a ⭐!
